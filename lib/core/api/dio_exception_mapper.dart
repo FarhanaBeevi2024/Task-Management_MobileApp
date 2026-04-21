@@ -14,8 +14,12 @@ ApiException mapDioException(
   switch (e.type) {
     case DioExceptionType.connectionTimeout:
     case DioExceptionType.sendTimeout:
-    case DioExceptionType.receiveTimeout:
       message = 'Connection timed out. Check your network and try again.';
+      break;
+    case DioExceptionType.receiveTimeout:
+      // Phone reached API base URL, but server did not finish (often backend → DB).
+      message =
+          'The server took too long to respond. If Wi‑Fi is fine, the machine running the API may be unable to reach the database (e.g. Supabase) or is overloaded.';
       break;
     case DioExceptionType.connectionError:
       message = 'Could not reach the server. Check your connection and try again.';
@@ -43,6 +47,18 @@ ApiException mapDioException(
       break;
   }
 
+  message = _humanizeBackendErrorMessage(message);
+
   return ApiException(message, statusCode: statusCode);
+}
+
+/// Node/Supabase often surfaces low-level [TypeError: fetch failed] in JSON;
+/// replace with something actionable for operators.
+String _humanizeBackendErrorMessage(String raw) {
+  final lower = raw.toLowerCase();
+  if (lower.contains('fetch failed')) {
+    return 'The API server could not reach the database (Supabase). On the PC or host running the backend, verify SUPABASE_URL and SUPABASE_SERVICE_KEY, outbound HTTPS access, and that the Supabase project is active (not paused).';
+  }
+  return raw;
 }
 

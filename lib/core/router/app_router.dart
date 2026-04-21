@@ -9,7 +9,10 @@ import '../../features/auth/screens/login_screen.dart';
 import '../../features/board/screens/board_screen.dart';
 import '../../features/home/screens/main_shell_screen.dart';
 import '../../features/milestones/screens/milestones_screen.dart';
+import '../../features/onboarding/screens/intro_screen.dart';
+import '../../features/projects/screens/project_overview_screen.dart';
 import '../../features/work_items/screens/work_items_screen.dart';
+import '../onboarding/onboarding_service.dart';
 import 'auth_refresh_listenable.dart';
 
 /// Central routing. Unauthenticated users go to `/login`.
@@ -20,19 +23,26 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
     refreshListenable: refresh,
-    redirect: (context, state) {
+    redirect: (context, state) async {
       final session = Supabase.instance.client.auth.currentSession;
       final atLogin = state.matchedLocation == '/login';
+      final atIntro = state.matchedLocation == '/intro';
 
-      if (session == null && !atLogin) {
-        return '/login';
+      if (session == null) {
+        final seen = await ref.read(onboardingServiceProvider).hasSeenIntro();
+        if (!seen && !atIntro) return '/intro';
+        if (seen && !atLogin) return '/login';
       }
-      if (session != null && atLogin) {
+      if (session != null && (atLogin || atIntro)) {
         return '/';
       }
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/intro',
+        builder: (context, state) => const IntroScreen(),
+      ),
       GoRoute(
         path: '/',
         builder: (context, state) => const MainShellScreen(),
@@ -60,6 +70,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/milestones',
         builder: (context, state) => const MilestonesScreen(),
+      ),
+      GoRoute(
+        path: '/project-overview',
+        builder: (context, state) => const ProjectOverviewScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

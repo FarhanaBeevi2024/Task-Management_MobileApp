@@ -58,6 +58,65 @@ class ProjectsApiService {
     }
   }
 
+  Future<ProjectModel> updateProject({
+    required String projectId,
+    required String name,
+    String? description,
+  }) async {
+    try {
+      final res = await _dio.put<Map<String, dynamic>>(
+        '/api/jira/projects/$projectId',
+        data: {
+          'name': name.trim(),
+          'description': description ?? '',
+        },
+      );
+      final data = res.data;
+      if (data == null) {
+        throw ApiException('Empty response', statusCode: res.statusCode);
+      }
+      return ProjectModel.fromJson(data);
+    } on DioException catch (e) {
+      throw mapDioException(e, fallbackMessage: 'Failed to update project');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchProjectMembers(String projectId) async {
+    try {
+      final res = await _dio.get<List<dynamic>>('/api/jira/projects/$projectId/members');
+      final list = res.data ?? [];
+      return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } on DioException catch (e) {
+      throw mapDioException(e, fallbackMessage: 'Failed to load project members');
+    }
+  }
+
+  Future<void> addProjectMember({
+    required String projectId,
+    required String userId,
+    required String projectRole,
+  }) async {
+    try {
+      await _dio.post<void>(
+        '/api/jira/projects/$projectId/members',
+        data: {'user_id': userId, 'project_role': projectRole},
+      );
+    } on DioException catch (e) {
+      throw mapDioException(e, fallbackMessage: 'Failed to add member');
+    }
+  }
+
+  Future<void> removeProjectMember({
+    required String projectId,
+    required String userId,
+  }) async {
+    try {
+      await _dio.delete<void>('/api/jira/projects/$projectId/members/$userId');
+    } on DioException catch (e) {
+      throw mapDioException(e, fallbackMessage: 'Failed to remove member');
+    }
+  }
+
   static String? _messageFromDioResponse(DioException e) {
     dynamic body = e.response?.data;
     if (body is String && body.trim().isNotEmpty) {

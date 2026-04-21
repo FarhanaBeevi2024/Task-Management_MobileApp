@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 
-import '../../../core/api/api_exception.dart';
+import '../../../core/api/dio_exception_mapper.dart';
 import '../models/user_model.dart';
 
 /// Auth + session helpers. Wire to Supabase or your backend token storage.
@@ -17,10 +17,7 @@ class AuthService {
       return UserModel.fromJson(data);
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) return null;
-      throw ApiException(
-        e.message ?? 'Request failed',
-        statusCode: e.response?.statusCode,
-      );
+      throw mapDioException(e, fallbackMessage: 'Failed to load profile');
     }
   }
 }

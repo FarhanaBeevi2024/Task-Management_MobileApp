@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/navigation/app_page_routes.dart';
 import '../../../core/permissions/session_permissions.dart';
@@ -94,6 +95,13 @@ class BoardScreen extends ConsumerWidget {
               elevation: 0,
               leading: const BackButton(),
               title: Text(projectName ?? 'Board'),
+              actions: [
+                IconButton(
+                  tooltip: 'Overview',
+                  icon: const Icon(Icons.info_outline_rounded),
+                  onPressed: () => context.push('/project-overview'),
+                ),
+              ],
             )
           : null,
       body: AnimatedSwitcher(
@@ -107,7 +115,10 @@ class BoardScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (!showAppBarBack && projectName != null && projectName.isNotEmpty)
-                  _ProjectBanner(name: projectName),
+                  _ProjectBanner(
+                    name: projectName,
+                    onOverview: () => context.push('/project-overview'),
+                  ),
                 Expanded(
                   child: LoadingSkeletons.kanbanBoard(
                     context,
@@ -135,7 +146,10 @@ class BoardScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (!showAppBarBack && projectName != null && projectName.isNotEmpty)
-                  _ProjectBanner(name: projectName),
+                  _ProjectBanner(
+                    name: projectName,
+                    onOverview: () => context.push('/project-overview'),
+                  ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
                   child: const _BoardFilters(),
@@ -546,9 +560,10 @@ Future<void> _boardSetIssueStatus(
 }
 
 class _ProjectBanner extends StatelessWidget {
-  const _ProjectBanner({required this.name});
+  const _ProjectBanner({required this.name, required this.onOverview});
 
   final String name;
+  final VoidCallback onOverview;
 
   @override
   Widget build(BuildContext context) {
@@ -574,6 +589,11 @@ class _ProjectBanner extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
               ),
+            ),
+            IconButton(
+              onPressed: onOverview,
+              tooltip: 'Overview',
+              icon: const Icon(Icons.info_outline_rounded, size: 20),
             ),
           ],
         ),
