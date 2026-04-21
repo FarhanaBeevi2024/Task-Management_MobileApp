@@ -6,8 +6,13 @@ import '../../projects/providers/projects_providers.dart';
 /// Board keyword search (summary, description, key, workflow, assignee, priorities, labels).
 final boardSearchQueryProvider = StateProvider<String>((ref) => '');
 
-/// Status filter (matches React: 'all' or a status key).
-final boardStatusFilterProvider = StateProvider<String>((ref) => 'all');
+/// Status filter for the Board list. Defaults to `to_do` (matches the reference UI tiles).
+///
+/// Values must match [IssueStatus.apiValue].
+final boardStatusFilterProvider = StateProvider<String>((ref) => 'to_do');
+
+/// Mobile-only: selected tab index for the board status tabs.
+final boardSelectedTabIndexProvider = StateProvider<int>((ref) => 0);
 
 /// Columns shown in the board.
 ///

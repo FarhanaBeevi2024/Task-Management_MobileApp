@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/permissions/session_permissions.dart';
 import '../../../core/widgets/app_snackbars.dart';
+import '../../../core/widgets/app_background.dart';
+import '../../../core/widgets/app_footer_nav.dart';
+import '../../../core/widgets/account_menu_button.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../projects/models/project_model.dart';
 import '../../projects/providers/projects_providers.dart';
@@ -196,22 +199,30 @@ class _UsersManagementScreenState extends ConsumerState<UsersManagementScreen> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Users'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => context.pop(),
-        ),
-        actions: [
-          TextButton.icon(
-            onPressed: () => _openCreateUser(context),
-            icon: const Icon(Icons.person_add_outlined, size: 20),
-            label: const Text('Add user'),
+    return AppBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        extendBody: true,
+        bottomNavigationBar: const AppFooterNav(),
+        appBar: AppBar(
+          title: const Text('Users'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => context.pop(),
           ),
-        ],
-      ),
-      body: async.when(
+          actions: [
+            const Padding(
+              padding: EdgeInsets.only(right: 4),
+              child: AccountMenuButton(),
+            ),
+            TextButton.icon(
+              onPressed: () => _openCreateUser(context),
+              icon: const Icon(Icons.person_add_outlined, size: 20),
+              label: const Text('Add user'),
+            ),
+          ],
+        ),
+        body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: Padding(
@@ -306,6 +317,7 @@ class _UsersManagementScreenState extends ConsumerState<UsersManagementScreen> {
             ),
           );
         },
+        ),
       ),
     );
   }

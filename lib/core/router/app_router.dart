@@ -7,12 +7,12 @@ import '../../features/admin/screens/access_control_screen.dart';
 import '../../features/admin/screens/users_management_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/board/screens/board_screen.dart';
+import '../../features/board/screens/board_status_tasks_screen.dart';
 import '../../features/home/screens/main_shell_screen.dart';
 import '../../features/milestones/screens/milestones_screen.dart';
 import '../../features/onboarding/screens/intro_screen.dart';
 import '../../features/projects/screens/project_overview_screen.dart';
 import '../../features/work_items/screens/work_items_screen.dart';
-import '../onboarding/onboarding_service.dart';
 import 'auth_refresh_listenable.dart';
 
 /// Central routing. Unauthenticated users go to `/login`.
@@ -21,20 +21,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
-    initialLocation: '/',
+    // Always show Intro first on app launch.
+    initialLocation: '/intro',
     refreshListenable: refresh,
     redirect: (context, state) async {
       final session = Supabase.instance.client.auth.currentSession;
       final atLogin = state.matchedLocation == '/login';
       final atIntro = state.matchedLocation == '/intro';
 
-      if (session == null) {
-        final seen = await ref.read(onboardingServiceProvider).hasSeenIntro();
-        if (!seen && !atIntro) return '/intro';
-        if (seen && !atLogin) return '/login';
-      }
-      if (session != null && (atLogin || atIntro)) {
+      // Intro should be accessible even when already signed in.
+      if (session != null && atLogin) {
         return '/';
+      }
+      // When signed out, Intro should appear before Login and other routes.
+      if (session == null && !(atIntro || atLogin)) {
+        return '/intro';
       }
       return null;
     },
@@ -50,6 +51,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/board',
         builder: (context, state) => const BoardScreen(showAppBarBack: true),
+      ),
+      GoRoute(
+        path: '/board/status',
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is! BoardStatusTasksArgs) {
+            return const Scaffold(body: Center(child: Text('Missing status args')));
+          }
+          return BoardStatusTasksScreen(args: extra);
+        },
       ),
       GoRoute(
         path: '/login',

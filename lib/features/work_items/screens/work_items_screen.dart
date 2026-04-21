@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/navigation/app_page_routes.dart';
+import '../../../core/widgets/app_background.dart';
+import '../../../core/widgets/app_footer_nav.dart';
+import '../../../core/widgets/account_menu_button.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../issues/models/issue_model.dart';
 import '../../issues/providers/issues_providers.dart';
@@ -25,15 +28,25 @@ class WorkItemsScreen extends ConsumerWidget {
     final projectsAsync = ref.watch(projectsListProvider);
     final selectedId = ref.watch(selectedProjectIdProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => context.pop(),
+    return AppBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        extendBody: true,
+        bottomNavigationBar: const AppFooterNav(),
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => context.pop(),
+          ),
+          title: const Text('Work items'),
+          actions: const [
+            Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: AccountMenuButton(),
+            ),
+          ],
         ),
-        title: const Text('Work items'),
-      ),
-      body: projectsAsync.when(
+        body: projectsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => ErrorStateView(
           error: e,
@@ -144,6 +157,7 @@ class WorkItemsScreen extends ConsumerWidget {
             ],
           );
         },
+        ),
       ),
     );
   }

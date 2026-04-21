@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/permissions/session_permissions.dart';
 import '../../../core/widgets/app_snackbars.dart';
+import '../../../core/widgets/app_background.dart';
+import '../../../core/widgets/app_footer_nav.dart';
+import '../../../core/widgets/account_menu_button.dart';
 import '../../../core/widgets/empty_state_view.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../issues/providers/issues_providers.dart';
@@ -154,18 +157,29 @@ class _ProjectOverviewScreenState extends ConsumerState<ProjectOverviewScreen> {
     );
 
     if (projectId == null || projectId.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () => context.pop(),
+      return AppBackground(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          extendBody: true,
+          bottomNavigationBar: const AppFooterNav(),
+          appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded),
+              onPressed: () => context.pop(),
+            ),
+            title: const Text('Overview'),
+            actions: const [
+              Padding(
+                padding: EdgeInsets.only(right: 8),
+                child: AccountMenuButton(),
+              ),
+            ],
           ),
-          title: const Text('Overview'),
-        ),
-        body: const EmptyStateView(
-          title: 'No project selected',
-          message: 'Go back and choose a project first.',
-          icon: Icons.folder_open_outlined,
+          body: const EmptyStateView(
+            title: 'No project selected',
+            message: 'Go back and choose a project first.',
+            icon: Icons.folder_open_outlined,
+          ),
         ),
       );
     }
@@ -173,26 +187,34 @@ class _ProjectOverviewScreenState extends ConsumerState<ProjectOverviewScreen> {
     final projectsAsync = ref.watch(projectsListProvider);
     final membersAsync = ref.watch(projectMembersProvider(projectId));
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => context.pop(),
-        ),
-        title: const Text('Overview'),
-        actions: [
-          if (canManageMembers)
-            TextButton(
-              onPressed: _savingProject
-                  ? null
-                  : () {
-                      setState(() => _editing = !_editing);
-                    },
-              child: Text(_editing ? 'Cancel' : 'Edit'),
+    return AppBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        extendBody: true,
+        bottomNavigationBar: const AppFooterNav(),
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => context.pop(),
+          ),
+          title: const Text('Overview'),
+          actions: [
+            const Padding(
+              padding: EdgeInsets.only(right: 4),
+              child: AccountMenuButton(),
             ),
-        ],
-      ),
-      body: projectsAsync.when(
+            if (canManageMembers)
+              TextButton(
+                onPressed: _savingProject
+                    ? null
+                    : () {
+                        setState(() => _editing = !_editing);
+                      },
+                child: Text(_editing ? 'Cancel' : 'Edit'),
+              ),
+          ],
+        ),
+        body: projectsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => ErrorStateView(error: e, onRetry: () => ref.invalidate(projectsListProvider)),
         data: (projects) {
@@ -219,7 +241,8 @@ class _ProjectOverviewScreenState extends ConsumerState<ProjectOverviewScreen> {
               ]);
             },
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              // Extra bottom padding so the footer nav never covers the last CTA (Add button).
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 130),
               children: [
                 Card(
                   elevation: 0,
@@ -377,6 +400,7 @@ class _ProjectOverviewScreenState extends ConsumerState<ProjectOverviewScreen> {
             ),
           );
         },
+        ),
       ),
     );
   }

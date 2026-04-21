@@ -5,7 +5,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/navigation/app_page_routes.dart';
 import '../../../core/permissions/session_permissions.dart';
+import '../../../core/widgets/app_background.dart';
+import '../../../core/widgets/app_footer_nav.dart';
 import '../../../core/widgets/app_snackbars.dart';
+import '../../../core/widgets/account_menu_button.dart';
 import '../../../core/widgets/empty_state_view.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../../core/widgets/loading_skeletons.dart';
@@ -17,7 +20,8 @@ import '../../issues/screens/task_form_screen.dart';
 import '../../issues/widgets/issue_task_actions_sheet.dart';
 import '../../projects/models/project_model.dart';
 import '../../projects/providers/projects_providers.dart'
-    show projectsListProvider, selectedProjectIdProvider;
+    show projectsListProvider, selectedProjectIdProvider, projectMembersProvider;
+import 'board_status_tasks_screen.dart';
 import '../providers/board_providers.dart';
 import '../theme/board_colors.dart';
 import '../widgets/board_issue_tile.dart';
@@ -45,6 +49,8 @@ class BoardScreen extends ConsumerWidget {
     ref.listen<String?>(selectedProjectIdProvider, (prev, next) {
       if (prev != next) {
         ref.read(boardSearchQueryProvider.notifier).state = '';
+        // Default to To Do when switching projects (reference behavior).
+        ref.read(boardStatusFilterProvider.notifier).state = IssueStatus.toDo.apiValue;
       }
     });
     final columns = ref.watch(visibleBoardColumnsProvider);
@@ -52,16 +58,17 @@ class BoardScreen extends ConsumerWidget {
     final projectsAsync = ref.watch(projectsListProvider);
     final isCompact = MediaQuery.sizeOf(context).width < 520;
 
-    final projectName = projectsAsync.whenOrNull(
+    final project = projectsAsync.whenOrNull(
       data: (List<ProjectModel> list) {
         final id = projectId;
         if (id == null || id.isEmpty) return null;
         for (final p in list) {
-          if (p.id == id) return p.name;
+          if (p.id == id) return p;
         }
         return null;
       },
     );
+    final projectName = project?.name;
 
     if (projectId == null || projectId.isEmpty) {
       final message = showAppBarBack
@@ -87,37 +94,42 @@ class BoardScreen extends ConsumerWidget {
       return body;
     }
 
-    return Scaffold(
-      backgroundColor: BoardColors.boardScaffoldBackground(context),
-      appBar: showAppBarBack
-          ? AppBar(
-              backgroundColor: BoardColors.boardScaffoldBackground(context),
-              elevation: 0,
-              leading: const BackButton(),
-              title: Text(projectName ?? 'Board'),
-              actions: [
-                IconButton(
-                  tooltip: 'Overview',
-                  icon: const Icon(Icons.info_outline_rounded),
-                  onPressed: () => context.push('/project-overview'),
-                ),
-              ],
-            )
-          : null,
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 360),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        child: issuesAsync.when(
+    return AppBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        extendBody: true,
+        appBar: showAppBarBack
+            ? AppBar(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                leading: const BackButton(),
+                title: Text(projectName ?? 'Board'),
+                actions: const [
+                  Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: AccountMenuButton(),
+                  ),
+                ],
+              )
+            : null,
+        bottomNavigationBar: const AppFooterNav(),
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 360),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          child: issuesAsync.when(
           loading: () => KeyedSubtree(
             key: const ValueKey('board-loading'),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (!showAppBarBack && projectName != null && projectName.isNotEmpty)
-                  _ProjectBanner(
-                    name: projectName,
-                    onOverview: () => context.push('/project-overview'),
+                if (project != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+                    child: _ProjectOverviewSection(
+                      project: project,
+                      onViewMore: () => context.push('/project-overview'),
+                    ),
                   ),
                 Expanded(
                   child: LoadingSkeletons.kanbanBoard(
@@ -145,82 +157,24 @@ class BoardScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (!showAppBarBack && projectName != null && projectName.isNotEmpty)
-                  _ProjectBanner(
-                    name: projectName,
-                    onOverview: () => context.push('/project-overview'),
+                if (project != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+                    child: _ProjectOverviewSection(
+                      project: project,
+                      onViewMore: () => context.push('/project-overview'),
+                    ),
                   ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-                  child: const _BoardFilters(),
-                ),
-                Expanded(
-                  child: SlidableAutoCloseBehavior(
-                    closeWhenOpened: true,
-                    closeWhenTapped: true,
-                    child: isCompact
-                        ? _MobileBoardTabs(
-                            projectId: projectId,
-                            columns: columns,
-                            all: all,
-                            showAppBarBack: showAppBarBack,
-                          )
-                        : ScrollConfiguration(
-                            behavior: ScrollConfiguration.of(context).copyWith(
-                              physics: const BouncingScrollPhysics(
-                                parent: AlwaysScrollableScrollPhysics(),
-                              ),
-                            ),
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
-                              itemCount: columns.length,
-                              separatorBuilder: (_, __) => const SizedBox(width: 14),
-                              itemBuilder: (context, i) {
-                                final column = columns[i];
-                                final filteredAll = _applyBoardFilters(ref, all);
-                                final list = issuesInColumn(filteredAll, column);
-                                return KanbanColumn(
-                                  width: _columnWidth,
-                                  column: column,
-                                  workflowColumns: columns,
-                                  issues: list,
-                                  projectId: projectId,
-                                  onIssueTap: (issue) {
-                                    Navigator.of(context).push<void>(
-                                      AppPageRoutes.fadeSlide(
-                                        IssueDetailScreen(issue: issue),
-                                      ),
-                                    );
-                                  },
-                                  onIssueActions: (issue) {
-                                    showIssueTaskActionsSheet(
-                                      context: context,
-                                      issue: issue,
-                                      projectId: projectId,
-                                    );
-                                  },
-                                  onIssueEdit: (issue) async {
-                                    final updated = await Navigator.of(context).push<IssueModel>(
-                                      AppPageRoutes.fade(
-                                        TaskFormScreen(
-                                          projectId: projectId,
-                                          issue: issue,
-                                        ),
-                                      ),
-                                    );
-                                    if (updated != null) {
-                                      invalidateProjectTasksData(ref, projectId);
-                                    }
-                                  },
-                                  onIssueSetStatus: (issue, status) =>
-                                      _boardSetIssueStatus(context, ref, projectId, issue, status),
-                                );
-                              },
-                            ),
-                          ),
+                if (project != null)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+                      child: _TaskOverviewSection(
+                        issues: _applyBoardFilters(ref, all, ignoreStatusFilter: true),
+                        workflowColumns: columns,
+                      ),
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -233,166 +187,7 @@ class BoardScreen extends ConsumerWidget {
               label: const Text('Add task'),
             )
           : null,
-    );
-  }
-}
-
-class _MobileBoardTabs extends ConsumerWidget {
-  const _MobileBoardTabs({
-    required this.projectId,
-    required this.columns,
-    required this.all,
-    required this.showAppBarBack,
-  });
-
-  final String projectId;
-  final List<IssueStatus> columns;
-  final List<IssueModel> all;
-  final bool showAppBarBack;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
-    final filteredAll = _applyBoardFilters(ref, all, ignoreStatusFilter: true);
-
-    return DefaultTabController(
-      key: ValueKey('mobile-tabs-${columns.map((c) => c.apiValue).join(",")}'),
-      length: columns.length,
-      child: Column(
-        children: [
-          Material(
-            color: Colors.transparent,
-            child: TabBar(
-              isScrollable: true,
-              dividerColor: Colors.transparent,
-              indicatorColor: scheme.primary,
-              labelColor: scheme.onSurface,
-              unselectedLabelColor: scheme.onSurfaceVariant,
-              labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-              tabs: [
-                for (final c in columns)
-                  Tab(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(c.label),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: scheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            '${issuesInColumn(filteredAll, c).length}',
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          Expanded(
-            child: TabBarView(
-              children: [
-                for (final c in columns)
-                  _MobileStatusList(
-                    projectId: projectId,
-                    workflowColumns: columns,
-                    column: c,
-                    issues: issuesInColumn(filteredAll, c),
-                    showAppBarBack: showAppBarBack,
-                  ),
-              ],
-            ),
-          ),
-        ],
       ),
-    );
-  }
-}
-
-class _MobileStatusList extends ConsumerWidget {
-  const _MobileStatusList({
-    required this.projectId,
-    required this.workflowColumns,
-    required this.column,
-    required this.issues,
-    required this.showAppBarBack,
-  });
-
-  final String projectId;
-  final List<IssueStatus> workflowColumns;
-  final IssueStatus column;
-  final List<IssueModel> issues;
-  final bool showAppBarBack;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (issues.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            'No tasks in ${column.label}',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontStyle: FontStyle.italic,
-                ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(14, 4, 14, 96),
-      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-      itemCount: issues.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, i) {
-        final issue = issues[i];
-        return BoardIssueTile(
-          slidableGroupTag: 'board-$projectId',
-          issue: issue,
-          workflowColumns: workflowColumns,
-          onOpenDetail: () {
-            Navigator.of(context).push<void>(
-              AppPageRoutes.fadeSlide(
-                IssueDetailScreen(issue: issue),
-              ),
-            );
-          },
-          onOpenActions: () {
-            showIssueTaskActionsSheet(
-              context: context,
-              issue: issue,
-              projectId: projectId,
-            );
-          },
-          onEdit: () async {
-            final updated = await Navigator.of(context).push<IssueModel>(
-              AppPageRoutes.fade(
-                TaskFormScreen(
-                  projectId: projectId,
-                  issue: issue,
-                ),
-              ),
-            );
-            if (updated != null) {
-              invalidateProjectTasksData(ref, projectId);
-            }
-          },
-          onSetStatus: (s) => _boardSetIssueStatus(context, ref, projectId, issue, s),
-        );
-      },
     );
   }
 }
@@ -598,6 +393,448 @@ class _ProjectBanner extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ProjectOverviewSection extends ConsumerWidget {
+  const _ProjectOverviewSection({
+    required this.project,
+    required this.onViewMore,
+  });
+
+  final ProjectModel project;
+  final VoidCallback onViewMore;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    final progressAsync = ref.watch(projectIssueProgressProvider(project.id));
+    final membersAsync = ref.watch(projectMembersProvider(project.id));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Project Overview',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const Spacer(),
+            TextButton(
+              onPressed: onViewMore,
+              child: const Text('View more'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Material(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(18),
+          elevation: 0,
+          child: InkWell(
+            onTap: onViewMore,
+            borderRadius: BorderRadius.circular(18),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.7)),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color.lerp(cs.surface, cs.primary, 0.10)!,
+                    cs.surface,
+                  ],
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: cs.primaryContainer.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.folder_open_rounded, color: cs.primary),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              project.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              (project.description ?? '').trim().isEmpty
+                                  ? 'Tap to view project details'
+                                  : project.description!.trim(),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                                height: 1.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      _OverviewChip(
+                        icon: Icons.groups_rounded,
+                        label: membersAsync.when(
+                          data: (m) => '${m.length} members',
+                          loading: () => 'Members…',
+                          error: (_, __) => 'Members',
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: progressAsync.when(
+                          data: (p) => _ProgressStrip(
+                            completed: p.completed,
+                            total: p.total,
+                            fraction: p.fraction,
+                            percent: p.percent,
+                          ),
+                          loading: () => const _ProgressStrip(
+                            completed: 0,
+                            total: 0,
+                            fraction: null,
+                            percent: null,
+                          ),
+                          error: (_, __) => const _ProgressStrip(
+                            completed: 0,
+                            total: 0,
+                            fraction: 0,
+                            percent: 0,
+                            error: true,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TaskOverviewSection extends StatelessWidget {
+  const _TaskOverviewSection({
+    required this.issues,
+    required this.workflowColumns,
+  });
+
+  final List<IssueModel> issues;
+  final List<IssueStatus> workflowColumns;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    IssueStatus? byStatusOrNull(IssueStatus s) {
+      for (final c in workflowColumns) {
+        if (c == s) return c;
+      }
+      return null;
+    }
+
+    final tiles = <_TaskOverviewTileData>[
+      if (byStatusOrNull(IssueStatus.toDo) != null)
+        _TaskOverviewTileData(
+          status: IssueStatus.toDo,
+          title: 'To Do',
+          color: const Color(0xFFE8E2FF), // pastel purple
+          icon: Icons.checklist_rounded,
+        ),
+      if (byStatusOrNull(IssueStatus.inProgress) != null)
+        _TaskOverviewTileData(
+          status: IssueStatus.inProgress,
+          title: 'In Process',
+          color: const Color(0xFFE2F0FF), // pastel blue
+          icon: Icons.play_circle_outline_rounded,
+        ),
+      if (byStatusOrNull(IssueStatus.inReview) != null)
+        _TaskOverviewTileData(
+          status: IssueStatus.inReview,
+          title: 'Reviewing',
+          color: const Color(0xFFFFE0EC), // pastel pink
+          icon: Icons.rate_review_outlined,
+        ),
+      if (byStatusOrNull(IssueStatus.done) != null)
+        _TaskOverviewTileData(
+          status: IssueStatus.done,
+          title: 'Complete',
+          color: const Color(0xFFE3F7EA), // pastel green
+          icon: Icons.verified_outlined,
+        ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Task Overview',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const Spacer(),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, c) {
+              // Fill remaining space with a 2x2 grid that stretches to the bottom.
+              final tileHeight = ((c.maxHeight - 12) / 2).clamp(120.0, 10000.0);
+              return GridView(
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  mainAxisExtent: tileHeight,
+                ),
+                children: [
+                  for (final t in tiles.take(4))
+                    _TaskOverviewTile(
+                      data: t,
+                      count: t.isPseudo ? 0 : issuesInColumn(issues, t.status).length,
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TaskOverviewTileData {
+  const _TaskOverviewTileData({
+    required this.status,
+    required this.title,
+    required this.color,
+    required this.icon,
+    this.isPseudo = false,
+  });
+
+  final IssueStatus status;
+  final String title;
+  final Color color;
+  final IconData icon;
+  final bool isPseudo;
+}
+
+class _TaskOverviewTile extends ConsumerWidget {
+  const _TaskOverviewTile({required this.data, required this.count});
+
+  final _TaskOverviewTileData data;
+  final int count;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final selectedApi = ref.watch(boardStatusFilterProvider);
+    final isSelected = !data.isPseudo && selectedApi == data.status.apiValue;
+    final projectId = ref.watch(selectedProjectIdProvider) ?? '';
+    final projectName = ref.watch(projectsListProvider).maybeWhen(
+          data: (list) {
+            for (final p in list) {
+              if (p.id == projectId) return p.name;
+            }
+            return 'Project';
+          },
+          orElse: () => 'Project',
+        );
+
+    return Material(
+      color: data.color,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: data.isPseudo
+            ? null
+            : () {
+                ref.read(boardStatusFilterProvider.notifier).state = data.status.apiValue;
+                if (projectId.isEmpty) return;
+                context.push(
+                  '/board/status',
+                  extra: BoardStatusTasksArgs(
+                    projectId: projectId,
+                    statusApiValue: data.status.apiValue,
+                    projectName: projectName,
+                  ),
+                );
+              },
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: isSelected ? Border.all(color: cs.primary, width: 1.5) : null,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: cs.surface.withValues(alpha: 0.70),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(data.icon, color: cs.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    data.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    data.isPseudo ? '—' : '$count tasks',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OverviewChip extends StatelessWidget {
+  const _OverviewChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: cs.onSurfaceVariant),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgressStrip extends StatelessWidget {
+  const _ProgressStrip({
+    required this.completed,
+    required this.total,
+    required this.fraction,
+    required this.percent,
+    this.error = false,
+  });
+
+  final int completed;
+  final int total;
+  final double? fraction; // null => loading shimmer-like
+  final int? percent; // null => loading
+  final bool error;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    final value = fraction;
+    final showIndeterminate = value == null;
+
+    final label = error
+        ? 'Progress unavailable'
+        : showIndeterminate
+            ? 'Loading progress…'
+            : total <= 0
+                ? 'No tasks yet'
+                : '$completed / $total • $percent%';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: error ? cs.error : cs.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            minHeight: 8,
+            value: showIndeterminate ? null : value!.clamp(0.0, 1.0),
+            backgroundColor: cs.surfaceContainerHighest,
+          ),
+        ),
+      ],
     );
   }
 }

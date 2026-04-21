@@ -7,6 +7,7 @@ import '../../../core/api/workspace_bootstrap.dart';
 import '../../../core/permissions/session_permissions.dart';
 import '../../../core/providers/active_organization_provider.dart';
 import '../../../core/widgets/app_background.dart';
+import '../../../core/widgets/account_menu_button.dart';
 import '../../auth/models/user_model.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../calendar/screens/project_calendar_screen.dart';
@@ -256,22 +257,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
             ),
             Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: Builder(
-                builder: (profileBtnContext) {
-                  return IconButton(
-                    tooltip: 'Account',
-                    onPressed: () => _showProfileAccountMenu(profileBtnContext, ref),
-                    style: IconButton.styleFrom(
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    icon: ref.watch(currentUserProvider).when(
-                      data: (u) => _profileAvatarIcon(cs, user: u),
-                      loading: () => _profileAvatarIcon(cs, user: null),
-                      error: (_, __) => _profileAvatarIcon(cs, user: null),
-                    ),
-                  );
-                },
-              ),
+              child: const AccountMenuButton(),
             ),
           ],
         ),

@@ -27,20 +27,22 @@ List<Map<String, dynamic>> _organizationsFromResponse(dynamic data) {
   return [];
 }
 
-void _setProviderState(dynamic ref, void Function() write) {
-  // [WidgetRef]: synchronous writes are OK from post-frame / async callbacks.
+Future<void> _setProviderState(dynamic ref, void Function() write) async {
+  // IMPORTANT (Riverpod): A provider must not synchronously modify other providers
+  // while it is initializing/building. Doing so triggers the assertion you saw.
   //
-  // [Ref] (e.g. `FutureProvider` bodies): deferring with [Future.microtask] caused
-  // `ensureDefaultWorkspace` to return before `activeOrganizationIdProvider` was
-  // updated, so callers like [projectsListProvider] ran `fetchProjects` without
-  // `X-Organization-Id` and could hang or error (seen as endless loading after
-  // re-login on routes such as `/milestones`). Writes after `await` in async
-  // providers are not in a synchronous provider build — apply immediately.
+  // - For widgets ([WidgetRef]) it is safe to write immediately.
+  // - For providers ([Ref]) we defer the write to the next event-loop tick, but
+  //   we still `await` it so callers don't race ahead without X-Organization-Id.
   if (ref is WidgetRef) {
     write();
-  } else {
-    write();
+    return;
   }
+  if (ref is Ref) {
+    await Future<void>.delayed(Duration.zero, write);
+    return;
+  }
+  write();
 }
 
 /// [WidgetRef] is implemented by [ConsumerStatefulElement], which has no
@@ -69,7 +71,7 @@ Future<void> ensureDefaultWorkspace(dynamic ref) async {
 
   final session = Supabase.instance.client.auth.currentSession;
   if (session == null) {
-    _setProviderState(ref, () {
+    await _setProviderState(ref, () {
       c.read(activeOrganizationIdProvider.notifier).state = null;
       c.read(orgBootstrapUserIdProvider.notifier).state = null;
     });
@@ -78,7 +80,7 @@ Future<void> ensureDefaultWorkspace(dynamic ref) async {
 
   final uid = session.user.id;
   if (c.read(orgBootstrapUserIdProvider) != uid) {
-    _setProviderState(ref, () {
+    await _setProviderState(ref, () {
       c.read(activeOrganizationIdProvider.notifier).state = null;
       c.read(orgBootstrapUserIdProvider.notifier).state = uid;
     });
@@ -103,7 +105,7 @@ Future<void> ensureDefaultWorkspace(dynamic ref) async {
 
     final id = orgs.first['id']?.toString();
     if (id != null && id.isNotEmpty) {
-      _setProviderState(ref, () {
+      await _setProviderState(ref, () {
         c.read(activeOrganizationIdProvider.notifier).state = id;
       });
       AppLogger.i('ensureDefaultWorkspace: active org set to $id');

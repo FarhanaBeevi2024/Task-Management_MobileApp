@@ -532,10 +532,11 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                           ? 'Update the details below.'
                           : 'Add a task to this project.',
                       style: GoogleFonts.inter(
-                        fontSize: 13,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
                         color: brightness == Brightness.dark
-                            ? scheme.onSurfaceVariant
-                            : _labelOnPastelLight.withValues(alpha: 0.88),
+                            ? scheme.onSurface
+                            : scheme.onSurface,
                         height: 1.35,
                       ),
                     ),
