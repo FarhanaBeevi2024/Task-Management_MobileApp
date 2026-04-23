@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/navigation/app_page_routes.dart';
+import '../../../core/permissions/session_permissions.dart';
 import '../../../core/widgets/app_snackbars.dart';
 import '../../../core/widgets/app_background.dart';
 import '../../../core/widgets/app_footer_nav.dart';
@@ -10,7 +11,6 @@ import '../../../core/widgets/empty_state_view.dart';
 import '../../issues/models/issue_model.dart';
 import '../../issues/models/issue_status.dart';
 import '../../issues/providers/issues_providers.dart';
-import '../../issues/services/issues_api_service.dart';
 import '../../issues/screens/issue_detail_screen.dart';
 import '../../issues/screens/task_form_screen.dart';
 import '../../issues/widgets/issue_task_actions_sheet.dart';
@@ -129,6 +129,11 @@ class _BoardStatusTasksScreenState extends ConsumerState<BoardStatusTasksScreen>
     final columns = ref.watch(visibleBoardColumnsProvider);
     final status = IssueStatus.fromApi(widget.args.statusApiValue);
     final effectiveStatus = columns.contains(status) ? status : columns.first;
+    final canCreateIssues = ref.watch(sessionPermissionsProvider).maybeWhen(
+          data: (p) => p.project.canCreateIssues,
+          orElse: () => false,
+        );
+    final showAddTaskFab = canCreateIssues && effectiveStatus == IssueStatus.toDo;
 
     // Ensure provider state matches this screen (so search/filter helpers work).
     ref.listenManual<String>(boardStatusFilterProvider, (prev, next) {});
@@ -219,7 +224,7 @@ class _BoardStatusTasksScreenState extends ConsumerState<BoardStatusTasksScreen>
                         icon: Icons.inbox_outlined,
                       )
                     : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(14, 4, 14, 96),
+                        padding: EdgeInsets.fromLTRB(14, 4, 14, showAddTaskFab ? 96 : 24),
                         physics: const BouncingScrollPhysics(
                           parent: AlwaysScrollableScrollPhysics(),
                         ),
@@ -268,16 +273,18 @@ class _BoardStatusTasksScreenState extends ConsumerState<BoardStatusTasksScreen>
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final saved = await Navigator.of(context).push<IssueModel>(
-            AppPageRoutes.fade(TaskFormScreen(projectId: projectId)),
-          );
-          if (saved != null) invalidateProjectTasksData(ref, projectId);
-        },
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add task'),
-      ),
+      floatingActionButton: showAddTaskFab
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                final saved = await Navigator.of(context).push<IssueModel>(
+                  AppPageRoutes.fade(TaskFormScreen(projectId: projectId)),
+                );
+                if (saved != null) invalidateProjectTasksData(ref, projectId);
+              },
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add task'),
+            )
+          : null,
       ),
     );
   }

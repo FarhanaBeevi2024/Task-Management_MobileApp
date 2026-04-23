@@ -13,6 +13,7 @@ import '../../features/milestones/screens/milestones_screen.dart';
 import '../../features/onboarding/screens/intro_screen.dart';
 import '../../features/projects/screens/project_overview_screen.dart';
 import '../../features/work_items/screens/work_items_screen.dart';
+import '../onboarding/onboarding_service.dart';
 import 'auth_refresh_listenable.dart';
 
 /// Central routing. Unauthenticated users go to `/login`.
@@ -21,21 +22,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
-    // Always show Intro first on app launch.
-    initialLocation: '/intro',
+    initialLocation: '/',
     refreshListenable: refresh,
     redirect: (context, state) async {
       final session = Supabase.instance.client.auth.currentSession;
       final atLogin = state.matchedLocation == '/login';
       final atIntro = state.matchedLocation == '/intro';
 
-      // Intro should be accessible even when already signed in.
-      if (session != null && atLogin) {
-        return '/';
+      if (session == null) {
+        final seen = await ref.read(onboardingServiceProvider).hasSeenIntro();
+        if (!seen && !atIntro) return '/intro';
+        if (seen && !atLogin) return '/login';
       }
-      // When signed out, Intro should appear before Login and other routes.
-      if (session == null && !(atIntro || atLogin)) {
-        return '/intro';
+      if (session != null && (atLogin || atIntro)) {
+        return '/';
       }
       return null;
     },

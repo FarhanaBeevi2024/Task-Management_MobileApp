@@ -472,8 +472,7 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
     final isBusy = _saving || (!widget.isEditing && _loadingTypes);
     final bottomInset = MediaQuery.of(context).padding.bottom;
     final viewInsets = MediaQuery.of(context).viewInsets.bottom;
-    /// Space for SafeArea + padded FilledButton (~88) plus comfortable scroll past last field.
-    final bottomScrollPad = bottomInset + viewInsets + 120;
+    final bottomScrollPad = bottomInset + viewInsets + 24;
     final gradient = _formGradient(scheme, brightness);
 
     final parentCandidates = _projectIssues
@@ -939,25 +938,6 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _descriptionController,
-                      enabled: !isBusy,
-                      style: GoogleFonts.inter(
-                        height: 1.4,
-                        color: brightness == Brightness.dark ? scheme.onSurface : _valueOnPastelLight,
-                      ),
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: _descriptionDecoration(scheme, brightness).copyWith(
-                        counterStyle: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: brightness == Brightness.dark ? scheme.onSurfaceVariant : _labelOnPastelLight,
-                        ),
-                      ),
-                      maxLength: _descriptionMaxLength,
-                      minLines: 4,
-                      maxLines: 10,
-                      validator: _validateDescription,
-                    ),
                     if (widget.isEditing) ...[
                       const SizedBox(height: 18),
                       Row(
@@ -1092,19 +1072,8 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                           ),
                         ),
                     ],
-                  ],
-                ),
-              ),
-              Material(
-                elevation: 10,
-                shadowColor: Colors.black.withValues(alpha: 0.12),
-                color: scheme.surface,
-                surfaceTintColor: scheme.surfaceTint,
-                child: SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-                    child: SizedBox(
+                    const SizedBox(height: 18),
+                    SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
                         onPressed: isBusy ? null : _save,
@@ -1117,13 +1086,14 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                                   color: scheme.onPrimary,
                                 ),
                               )
-                            : Icon(widget.isEditing ? Icons.save_rounded : Icons.add_task_rounded, size: 22),
+                            : Icon(
+                                widget.isEditing ? Icons.save_rounded : Icons.add_task_rounded,
+                                size: 22,
+                              ),
                         label: Padding(
                           padding: const EdgeInsets.only(left: 4),
                           child: Text(
-                            _saving
-                                ? 'Saving…'
-                                : (widget.isEditing ? 'Save changes' : 'Create Task'),
+                            _saving ? 'Saving…' : (widget.isEditing ? 'Save changes' : 'Create Task'),
                             style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),
                           ),
                         ),
@@ -1132,7 +1102,8 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                         ),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                  ],
                 ),
               ),
             ],

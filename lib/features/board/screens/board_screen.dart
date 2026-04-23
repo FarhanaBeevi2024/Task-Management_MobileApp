@@ -626,7 +626,7 @@ class _TaskOverviewSection extends StatelessWidget {
                   crossAxisCount: 2,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  mainAxisExtent: tileHeight,
+                  mainAxisExtent: 180,
                 ),
                 children: [
                   for (final t in tiles.take(4))
