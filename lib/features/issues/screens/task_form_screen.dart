@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/widgets/account_menu_button.dart';
+import '../../../core/widgets/app_background.dart';
+import '../../../core/widgets/app_footer_nav.dart';
 import '../../../core/permissions/session_permissions.dart';
 import '../../../core/navigation/app_page_routes.dart';
 import '../../projects/providers/projects_providers.dart';
@@ -488,38 +491,34 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
         ? ref.watch(issueActivityLogsProvider(widget.issue!.id))
         : null;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: scheme.inverseSurface,
-        surfaceTintColor: Colors.transparent,
-        foregroundColor: scheme.onInverseSurface,
-        iconTheme: IconThemeData(color: scheme.onInverseSurface),
-        titleTextStyle: GoogleFonts.inter(
-          color: scheme.onInverseSurface,
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.2,
+    return AppBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        // Keep footer fixed and reserve layout space (no overlap/blur).
+        extendBody: false,
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: Text(widget.isEditing ? 'Edit task' : 'New task'),
+          actions: const [
+            Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: AccountMenuButton(),
+            ),
+          ],
         ),
-        title: Text(
-          widget.isEditing ? 'Edit task' : 'New task',
-          style: GoogleFonts.inter(
-            color: scheme.onInverseSurface,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.2,
-          ),
-        ),
-      ),
-      body: DecoratedBox(
-        decoration: BoxDecoration(gradient: gradient),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              Expanded(
-                child: ListView(
+        bottomNavigationBar: const AppFooterNav(),
+        body: SafeArea(
+          bottom: true,
+          child: DecoratedBox(
+            decoration: BoxDecoration(gradient: gradient),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(
                     parent: BouncingScrollPhysics(),
                   ),
@@ -1104,9 +1103,11 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

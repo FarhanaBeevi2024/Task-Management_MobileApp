@@ -101,12 +101,15 @@ Future<void> _boardSetIssueStatus(
 
 class _BoardStatusTasksScreenState extends ConsumerState<BoardStatusTasksScreen> {
   late final TextEditingController _search;
+  late final FocusNode _searchFocus;
+  bool _isSearching = false;
 
   @override
   void initState() {
     super.initState();
     _search = TextEditingController(text: ref.read(boardSearchQueryProvider));
     _search.addListener(_syncToProvider);
+    _searchFocus = FocusNode();
   }
 
   void _syncToProvider() {
@@ -120,6 +123,7 @@ class _BoardStatusTasksScreenState extends ConsumerState<BoardStatusTasksScreen>
   void dispose() {
     _search.removeListener(_syncToProvider);
     _search.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -172,50 +176,67 @@ class _BoardStatusTasksScreenState extends ConsumerState<BoardStatusTasksScreen>
                       ),
                       const SizedBox(width: 4),
                       Expanded(
-                        child: Text(
-                          '${widget.args.projectName} • ${effectiveStatus.label}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          switchInCurve: Curves.easeOut,
+                          switchOutCurve: Curves.easeIn,
+                          child: _isSearching
+                              ? TextField(
+                                  key: const ValueKey('header-search'),
+                                  controller: _search,
+                                  focusNode: _searchFocus,
+                                  autofocus: true,
+                                  textInputAction: TextInputAction.search,
+                                  style: const TextStyle(fontSize: 13, height: 1.15),
+                                  decoration: InputDecoration(
+                                    hintText: 'Search keyword',
+                                    hintStyle: const TextStyle(fontSize: 13, height: 1.15),
+                                    prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                                    isDense: true,
+                                    filled: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  '${widget.args.projectName} • ${effectiveStatus.label}',
+                                  key: const ValueKey('header-title'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                ),
                         ),
                       ),
                       const SizedBox(width: 6),
+                      IconButton(
+                        tooltip: _isSearching ? 'Close search' : 'Search',
+                        onPressed: () {
+                          setState(() => _isSearching = !_isSearching);
+                          if (_isSearching) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (!mounted) return;
+                              _searchFocus.requestFocus();
+                            });
+                          } else {
+                            _searchFocus.unfocus();
+                          }
+                        },
+                        icon: Icon(
+                          _isSearching ? Icons.close_rounded : Icons.search_rounded,
+                        ),
+                      ),
                       const AccountMenuButton(),
                     ],
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _search,
-                        textInputAction: TextInputAction.search,
-                        decoration: InputDecoration(
-                          hintText: 'Search keyword',
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          filled: true,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      tooltip: 'Clear search',
-                      onPressed: () {
-                        _search.clear();
-                        ref.read(boardSearchQueryProvider.notifier).state = '';
-                      },
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
-                ),
-              ),
               Expanded(
                 child: list.isEmpty
                     ? const EmptyStateView(

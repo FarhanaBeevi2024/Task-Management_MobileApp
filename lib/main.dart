@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -10,7 +11,18 @@ import 'core/config/supabase_config.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  final rawEnvAsset = await rootBundle.loadString('assets/env/app.env');
+  final rawBaseUrlLine = rawEnvAsset
+      .split('\n')
+      .map((l) => l.trim())
+      .firstWhere(
+        (l) => l.startsWith('API_BASE_URL='),
+        orElse: () => '<missing API_BASE_URL>',
+      );
+  debugPrint('asset(app.env) $rawBaseUrlLine');
+
   await dotenv.load(fileName: 'assets/env/app.env');
+  debugPrint('dotenv[API_BASE_URL] = ${dotenv.env['API_BASE_URL']}');
   debugPrint('AppConfig.apiBaseUrl = ${AppConfig.apiBaseUrl}');
 
   if (SupabaseConfig.isConfigured) {
