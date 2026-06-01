@@ -1,18 +1,44 @@
+# --- Flutter / Dart ---
 .dart_tool/
 .packages
+.pub/
 build/
-.flutter-plugins
-.flutter-plugins-dependencies
-*.iml
+flutter_*.log
+
+# --- Environment / secrets ---
+assets/env/app.env
+.env
+.env.*
+!.env.example
+
+# --- Android ---
+android/.gradle/
+android/local.properties
+android/key.properties
+android/**/GeneratedPluginRegistrant.java
+
+# Release signing keys (never commit)
+**/*.jks
+**/*.keystore
+
+# --- iOS / macOS ---
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+ios/Runner/GeneratedPluginRegistrant.*
+ios/Runner.xcworkspace/
+**/.DS_Store
+
+macos/Pods/
+macos/Flutter/ephemeral/
+macos/Runner/GeneratedPluginRegistrant.*
+
+# --- Xcode user data ---
+**/xcuserdata/
+**/*.xcuserstate
+**/*.xccheckout
+
+# --- IntelliJ / Android Studio / VSCode ---
 .idea/
+*.iml
 .vscode/
-**/doc/api/
-**/ios/.symlinks/
-**/ios/Pods/
-**/ios/Flutter/Flutter.framework
-**/ios/Flutter/Flutter.podspec
-**/android/.gradle/
-**/android/captures/
-**/android/local.properties
-*.lock.hive
-app.env

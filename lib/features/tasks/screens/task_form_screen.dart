@@ -60,7 +60,14 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
 
   String? _validateTitle(String? value) {
     final t = (value ?? '').trim();
-    if (t.isEmpty) return 'Title is required';
+    if (t.isEmpty) return 'Summary is required';
+    return null;
+  }
+
+  String? _validateDueDate(String? value) {
+    final t = (value ?? '').trim();
+    if (t.isEmpty) return 'Due date is required';
+    if (DateTime.tryParse(t) == null) return 'Enter a valid date';
     return null;
   }
 
@@ -161,7 +168,7 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                     controller: _titleController,
                     enabled: !isBusy,
                     decoration: const InputDecoration(
-                      labelText: 'Title *',
+                      labelText: 'Summary *',
                       hintText: 'Enter task title',
                       border: OutlineInputBorder(),
                     ),
@@ -205,7 +212,7 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                         child: DropdownButtonFormField<String>(
                           value: _status,
                           decoration: const InputDecoration(
-                            labelText: 'Status',
+                            labelText: 'Status *',
                             border: OutlineInputBorder(),
                           ),
                           items: const [
@@ -215,6 +222,7 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                             DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
                           ],
                           onChanged: isBusy ? null : (v) => setState(() => _status = v ?? 'pending'),
+                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Select a status' : null,
                         ),
                       ),
                     ],
@@ -225,7 +233,7 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                     enabled: !isBusy,
                     readOnly: true,
                     decoration: InputDecoration(
-                      labelText: 'Due Date',
+                      labelText: 'Due date *',
                       border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
                         onPressed: isBusy ? null : _pickDueDate,
@@ -233,6 +241,7 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                       ),
                     ),
                     onTap: isBusy ? null : _pickDueDate,
+                    validator: _validateDueDate,
                   ),
                   const SizedBox(height: 16),
                   if (isTeamLeader) ...[

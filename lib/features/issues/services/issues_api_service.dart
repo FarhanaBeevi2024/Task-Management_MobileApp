@@ -202,6 +202,8 @@ class IssuesApiService {
           .where((log) => log.id.isNotEmpty)
           .toList();
     } on DioException catch (e) {
+      // Match web IssueDetail: no history when access is denied (e.g. team_member not on task).
+      if (e.response?.statusCode == 403) return [];
       throw mapDioException(e, fallbackMessage: 'Failed to load activity');
     }
   }
@@ -237,6 +239,7 @@ class IssuesApiService {
     String? assigneeId,
     String? milestoneId,
     String? workflowStatus,
+    bool includeAssigneeId = true,
   }) async {
     try {
       final data = <String, dynamic>{
@@ -251,11 +254,13 @@ class IssuesApiService {
         'due_date': (dueDateYyyyMmDd == null || dueDateYyyyMmDd.isEmpty) ? null : dueDateYyyyMmDd,
         'estimated_days': estimatedDays,
         'actual_days': actualDays,
-        'assignee_id': (assigneeId == null || assigneeId.isEmpty) ? null : assigneeId,
         'milestone_id': (milestoneId == null || milestoneId.isEmpty) ? null : milestoneId,
         'exposed_to_client': exposedToClient,
         if (workflowStatus != null && workflowStatus.isNotEmpty) 'workflow_status': workflowStatus,
       };
+      if (includeAssigneeId) {
+        data['assignee_id'] = (assigneeId == null || assigneeId.isEmpty) ? null : assigneeId;
+      }
 
       final res = await _dio.put<Map<String, dynamic>>(
         '/api/jira/issues/$issueId',

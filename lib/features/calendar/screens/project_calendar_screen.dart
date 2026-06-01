@@ -49,6 +49,16 @@ Map<String, List<IssueModel>> _issuesByDueDate(List<IssueModel> issues) {
 /// Leading blank cells when the month grid starts on Sunday (same as web).
 int _leadingBlankCount(DateTime firstOfMonth) => firstOfMonth.weekday % 7;
 
+/// Seven-day rows for the month grid (each row may have `null` padding cells).
+List<List<DateTime?>> _weeksForMonthGrid(DateTime monthStart) {
+  final days = _daysForMonthGrid(monthStart);
+  final weeks = <List<DateTime?>>[];
+  for (var i = 0; i < days.length; i += 7) {
+    weeks.add(days.sublist(i, i + 7));
+  }
+  return weeks;
+}
+
 List<DateTime?> _daysForMonthGrid(DateTime monthStart) {
   final first = DateTime(monthStart.year, monthStart.month, 1);
   final lead = _leadingBlankCount(first);
@@ -148,19 +158,19 @@ class _ProjectCalendarScreenState extends ConsumerState<ProjectCalendarScreen> {
         );
         final issuesAsync = ref.watch(issuesForProjectProvider(effectiveId));
 
-        return RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(projectsListProvider);
-            ref.invalidate(issuesForProjectProvider(effectiveId));
-            await ref.read(issuesForProjectProvider(effectiveId).future);
-          },
-          child: ListView(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              8,
-              16,
-              projectsTabListBottomPadding(context),
-            ),
+        final bottomPad = projectsTabListBottomPadding(context);
+
+        Future<void> onRefresh() async {
+          ref.invalidate(projectsListProvider);
+          ref.invalidate(issuesForProjectProvider(effectiveId));
+          await ref.read(issuesForProjectProvider(effectiveId).future);
+        }
+
+        // Column + Expanded needs a bounded parent (not inside ScrollView).
+        return Padding(
+          padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPad),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
                 project.name,
@@ -202,84 +212,154 @@ class _ProjectCalendarScreenState extends ConsumerState<ProjectCalendarScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              issuesAsync.when(
-                loading: () => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 32),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                error: (e, _) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Text(
-                    '$e',
-                    style: TextStyle(color: cs.error),
-                  ),
-                ),
-                data: (issues) {
-                  final byDate = _issuesByDueDate(issues);
-                  final todayKey = _ymdLocal(DateTime.now());
-                  final gridDays = _daysForMonthGrid(_visibleMonth);
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-                            .map(
-                              (d) => Expanded(
-                                child: Center(
-                                  child: Text(
-                                    d,
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: cs.onSurfaceVariant,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: onRefresh,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: SizedBox(
+                          height: constraints.maxHeight,
+                          width: constraints.maxWidth,
+                          child: issuesAsync.when(
+                            loading: () => const Center(child: CircularProgressIndicator()),
+                            error: (e, _) => Center(
+                              child: Text(
+                                '$e',
+                                style: TextStyle(color: cs.error),
+                                textAlign: TextAlign.center,
                               ),
-                            )
-                            .toList(),
-                      ),
-                      const SizedBox(height: 8),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 7,
-                          mainAxisSpacing: 6,
-                          crossAxisSpacing: 6,
-                          childAspectRatio: 0.52,
-                        ),
-                        itemCount: gridDays.length,
-                        itemBuilder: (context, index) {
-                          final day = gridDays[index];
-                          if (day == null) {
-                            return const SizedBox.shrink();
-                          }
-                          final key = _ymdLocal(day);
-                          final dayIssues = byDate[key] ?? [];
-                          final isToday = key == todayKey;
-                          return _CalendarDayCell(
-                            day: day,
-                            isToday: isToday,
-                            issues: dayIssues,
-                            onIssueTap: (issue) {
-                              Navigator.of(context).push(
-                                AppPageRoutes.fade(IssueDetailScreen(issue: issue)),
+                            ),
+                            data: (issues) {
+                              final byDate = _issuesByDueDate(issues);
+                              final todayKey = _ymdLocal(DateTime.now());
+                              final weeks = _weeksForMonthGrid(_visibleMonth);
+                              final dueCount = issues.where((i) => i.dueDate != null).length;
+                              return _ExpandedMonthCalendar(
+                                weeks: weeks,
+                                byDate: byDate,
+                                todayKey: todayKey,
+                                dueCountLabel:
+                                    '$dueCount issue(s) with a due date in this project.',
+                                onIssueTap: (issue) {
+                                  Navigator.of(context).push(
+                                    AppPageRoutes.fade(IssueDetailScreen(issue: issue)),
+                                  );
+                                },
                               );
                             },
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        '${issues.where((i) => i.dueDate != null).length} issue(s) with a due date in this project.',
-                        style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                      ),
-                    ],
-                  );
-                },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
             ],
           ),
+        );
+      },
+    );
+  }
+}
+
+/// Fills remaining viewport height and splits it evenly across week rows.
+class _ExpandedMonthCalendar extends StatelessWidget {
+  const _ExpandedMonthCalendar({
+    required this.weeks,
+    required this.byDate,
+    required this.todayKey,
+    required this.dueCountLabel,
+    required this.onIssueTap,
+  });
+
+  final List<List<DateTime?>> weeks;
+  final Map<String, List<IssueModel>> byDate;
+  final String todayKey;
+  final String dueCountLabel;
+  final void Function(IssueModel issue) onIssueTap;
+
+  static const _weekdayRowHeight = 22.0;
+  static const _weekdayGap = 8.0;
+  static const _rowGap = 6.0;
+  static const _footerGap = 10.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final weekCount = weeks.length;
+        final gaps = _weekdayGap + (weekCount > 0 ? (weekCount - 1) * _rowGap : 0) + _footerGap;
+        const footerTextHeight = 18.0;
+        final gridHeight = (constraints.maxHeight -
+                _weekdayRowHeight -
+                gaps -
+                footerTextHeight)
+            .clamp(120.0, constraints.maxHeight);
+        final rowHeight =
+            weekCount > 0 ? (gridHeight - (weekCount - 1) * _rowGap) / weekCount : gridHeight;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: _weekdayRowHeight,
+              child: Row(
+                children: ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+                    .map(
+                      (d) => Expanded(
+                        child: Center(
+                          child: Text(
+                            d,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+            const SizedBox(height: _weekdayGap),
+            for (var w = 0; w < weeks.length; w++)
+              Padding(
+                padding: EdgeInsets.only(bottom: w < weeks.length - 1 ? _rowGap : 0),
+                child: SizedBox(
+                  height: rowHeight,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final day in weeks[w])
+                        Expanded(
+                          child: day == null
+                              ? const SizedBox.shrink()
+                              : Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                                  child: _CalendarDayCell(
+                                    day: day,
+                                    isToday: _ymdLocal(day) == todayKey,
+                                    issues: byDate[_ymdLocal(day)] ?? [],
+                                    stretch: true,
+                                    onIssueTap: onIssueTap,
+                                  ),
+                                ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            const SizedBox(height: _footerGap),
+            Text(
+              dueCountLabel,
+              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
         );
       },
     );
@@ -370,18 +450,104 @@ class _CalendarDayCell extends StatelessWidget {
     required this.isToday,
     required this.issues,
     required this.onIssueTap,
+    this.stretch = false,
   });
 
   final DateTime day;
   final bool isToday;
   final List<IssueModel> issues;
   final void Function(IssueModel issue) onIssueTap;
+  final bool stretch;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final border = isToday ? Border.all(color: cs.primary, width: 2) : Border.all(color: cs.outlineVariant.withValues(alpha: 0.5));
+    final hasIssues = issues.isNotEmpty;
+    final border = isToday
+        ? Border.all(color: cs.primary, width: 2)
+        : Border.all(color: cs.outlineVariant.withValues(alpha: hasIssues ? 0.5 : 0.35));
+    final dayStyle = hasIssues
+        ? theme.textTheme.titleSmall
+        : theme.textTheme.labelLarge;
+
+    final issueWidgets = <Widget>[
+      for (final issue in issues.take(stretch ? 6 : 3))
+        Padding(
+          padding: const EdgeInsets.only(bottom: 3),
+          child: InkWell(
+            onTap: () => onIssueTap(issue),
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+              decoration: BoxDecoration(
+                color: BoardColors.statusPair(issue.status).$2,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: _IssuePillLine(
+                issue: issue,
+                theme: theme,
+              ),
+            ),
+          ),
+        ),
+      if (issues.length > (stretch ? 6 : 3))
+        Text(
+          '+${issues.length - (stretch ? 6 : 3)} more',
+          style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+        ),
+    ];
+
+    final cellChildren = <Widget>[
+      Row(
+        children: [
+          Flexible(
+            child: Text(
+              '${day.day}',
+              maxLines: 1,
+              overflow: TextOverflow.clip,
+              style: dayStyle?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: isToday ? cs.primary : cs.onSurface,
+              ),
+            ),
+          ),
+          if (hasIssues) ...[
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: cs.primaryContainer,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '${issues.length}',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: cs.onPrimaryContainer,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+      if (hasIssues) ...[
+        const SizedBox(height: 4),
+        if (stretch)
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              physics: const ClampingScrollPhysics(),
+              children: issueWidgets,
+            ),
+          )
+        else
+          ...issueWidgets,
+      ] else if (stretch)
+        const Spacer(),
+    ];
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: cs.surface,
@@ -389,80 +555,11 @@ class _CalendarDayCell extends StatelessWidget {
         border: border,
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+        padding: EdgeInsets.fromLTRB(4, hasIssues ? 6 : 4, 4, hasIssues ? 6 : 4),
         child: Column(
+          mainAxisSize: stretch ? MainAxisSize.max : MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Flexible(
-                  child: Text(
-                    '${day.day}',
-                    maxLines: 1,
-                    overflow: TextOverflow.clip,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: isToday ? cs.primary : cs.onSurface,
-                    ),
-                  ),
-                ),
-                if (issues.isNotEmpty) ...[
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '${issues.length}',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: cs.onPrimaryContainer,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 4),
-            Expanded(
-              child: issues.isEmpty
-                  ? const SizedBox.shrink()
-                  : ListView(
-                      padding: EdgeInsets.zero,
-                      physics: const ClampingScrollPhysics(),
-                      children: [
-                        ...issues.take(3).map(
-                              (issue) => Padding(
-                                padding: const EdgeInsets.only(bottom: 3),
-                                child: InkWell(
-                                  onTap: () => onIssueTap(issue),
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: BoardColors.statusPair(issue.status).$2,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: _IssuePillLine(
-                                      issue: issue,
-                                      theme: theme,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                        if (issues.length > 3)
-                          Text(
-                            '+${issues.length - 3} more',
-                            style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-                          ),
-                      ],
-                    ),
-            ),
-          ],
+          children: cellChildren,
         ),
       ),
     );

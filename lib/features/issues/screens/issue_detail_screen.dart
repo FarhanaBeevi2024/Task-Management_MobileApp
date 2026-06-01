@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../projects/providers/projects_providers.dart';
-import '../../../core/permissions/session_permissions.dart';
 import '../models/issue_activity_log.dart';
 import '../models/issue_model.dart';
 import '../providers/issues_providers.dart';
@@ -61,32 +60,6 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
       appBar: AppBar(
         title: Text(display.issueKey ?? 'Issue'),
         actions: [
-          if (projectId != null && projectId.isNotEmpty)
-            ref.watch(sessionPermissionsProvider).maybeWhen(
-                  data: (p) => p.project.canCreateIssues
-                      ? IconButton(
-                          icon: const Icon(Icons.subdirectory_arrow_right_rounded),
-                          tooltip: 'Add subtask',
-                          onPressed: () async {
-                            final created = await Navigator.of(context).push<IssueModel>(
-                              MaterialPageRoute(
-                                builder: (_) => TaskFormScreen(
-                                  projectId: projectId,
-                                  initialParentIssueId: display.id,
-                                ),
-                              ),
-                            );
-                            if (created != null && context.mounted) {
-                              final pid = ref.read(selectedProjectIdProvider);
-                              if (pid != null && pid.isNotEmpty) {
-                                invalidateProjectTasksData(ref, pid);
-                              }
-                            }
-                          },
-                        )
-                      : const SizedBox.shrink(),
-                  orElse: () => const SizedBox.shrink(),
-                ),
           if (projectId != null && projectId.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.edit_outlined),
@@ -341,9 +314,11 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                 padding: EdgeInsets.symmetric(vertical: 16),
                 child: Center(child: CircularProgressIndicator()),
               ),
-              error: (e, _) => Text(
-                e.toString(),
-                style: textTheme.bodyMedium?.copyWith(color: scheme.error),
+              error: (_, __) => Text(
+                'Could not load history.',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
             ),
           ],

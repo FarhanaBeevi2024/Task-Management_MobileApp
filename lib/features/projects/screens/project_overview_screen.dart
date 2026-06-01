@@ -67,9 +67,7 @@ class _ProjectOverviewScreenState extends ConsumerState<ProjectOverviewScreen> {
       // Keep selection stable; ProjectModel is fetched from list provider.
       if (mounted) {
         setState(() => _editing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Project updated')),
-        );
+        showAppToast(context, 'Project updated');
       }
       // Ensure controllers reflect saved value if user reopens edit quickly.
       _nameCtrl.text = updated.name;
@@ -96,9 +94,7 @@ class _ProjectOverviewScreenState extends ConsumerState<ProjectOverviewScreen> {
           _selectedUserId = '';
           _selectedProjectRole = 'team_member';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Member added')),
-        );
+        showAppToast(context, 'Member added');
       }
     } catch (e) {
       if (mounted) showErrorSnackBar(context, e, fallback: 'Could not add member.');
@@ -115,7 +111,7 @@ class _ProjectOverviewScreenState extends ConsumerState<ProjectOverviewScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Remove member'),
-        content: Text('Remove ${member.email} from this project?'),
+        content: Text('Remove ${member.memberLabel} from this project?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           FilledButton(
@@ -137,9 +133,7 @@ class _ProjectOverviewScreenState extends ConsumerState<ProjectOverviewScreen> {
           );
       ref.invalidate(projectMembersProvider(projectId));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Member removed')),
-        );
+        showAppToast(context, 'Member removed');
       }
     } catch (e) {
       if (mounted) showErrorSnackBar(context, e, fallback: 'Could not remove member.');
@@ -354,13 +348,16 @@ class _ProjectOverviewScreenState extends ConsumerState<ProjectOverviewScreen> {
                         children: [
                           for (final m in members) ...[
                             ListTile(
-                              title: Text(m.email),
+                              title: Text(m.memberLabel),
                               subtitle: Text(m.projectRole),
                               trailing: canManageMembers
-                                  ? TextButton(
+                                  ? IconButton(
                                       onPressed: () => _removeMember(projectId: projectId, member: m),
-                                      style: TextButton.styleFrom(foregroundColor: scheme.error),
-                                      child: const Text('Remove'),
+                                      icon: const Icon(Icons.delete_outline_rounded),
+                                      tooltip: 'Remove from project',
+                                      style: IconButton.styleFrom(
+                                        foregroundColor: scheme.error,
+                                      ),
                                     )
                                   : null,
                             ),
@@ -470,8 +467,8 @@ class _AddMemberForm extends ConsumerWidget {
                         value: u.userId,
                         child: Text(
                           u.role != null && u.role!.trim().isNotEmpty
-                              ? '${u.email} (${u.role})'
-                              : u.email,
+                              ? '${u.displayLabel} (${u.role})'
+                              : u.displayLabel,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),

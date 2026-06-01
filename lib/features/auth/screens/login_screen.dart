@@ -71,6 +71,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ref.invalidate(projectsListProvider);
       ref.invalidate(sessionPermissionsProvider);
       ref.invalidate(currentUserProvider);
+      // Load projects + profile + access-config before opening the shell so the first
+      // frame shows data instead of a second loading phase on the Projects tab.
+      try {
+        await Future.wait([
+          ref.read(projectsListProvider.future),
+          ref.read(sessionPermissionsProvider.future),
+        ]);
+      } catch (_) {
+        // Home screen error/retry UI handles failed fetches.
+      }
+      if (!mounted) return;
       context.go('/');
     } on AuthException catch (e) {
       _showMessage(e.message);

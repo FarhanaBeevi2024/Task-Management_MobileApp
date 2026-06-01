@@ -670,6 +670,14 @@ class _TaskOverviewTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final isLightTile =
+        ThemeData.estimateBrightnessForColor(data.color) == Brightness.light;
+    final tileOnSurface = isLightTile ? const Color(0xFF1C1B1F) : const Color(0xFFF2F2F2);
+    final tileOnSurfaceVariant =
+        isLightTile ? const Color(0xFF49454F) : const Color(0xFFCAC4D0);
+    final iconChipBg = isLightTile
+        ? Color.alphaBlend(Colors.black.withValues(alpha: 0.07), data.color)
+        : Color.alphaBlend(Colors.white.withValues(alpha: 0.14), data.color);
     final selectedApi = ref.watch(boardStatusFilterProvider);
     final isSelected = !data.isPseudo && selectedApi == data.status.apiValue;
     final projectId = ref.watch(selectedProjectIdProvider) ?? '';
@@ -718,10 +726,10 @@ class _TaskOverviewTile extends ConsumerWidget {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: cs.surface.withValues(alpha: 0.70),
+                      color: iconChipBg,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(data.icon, color: cs.onSurfaceVariant),
+                    child: Icon(data.icon, color: tileOnSurfaceVariant),
                   ),
                   const SizedBox(height: 10),
                   Text(
@@ -730,13 +738,14 @@ class _TaskOverviewTile extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w800,
+                      color: tileOnSurface,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     data.isPseudo ? '—' : '$count tasks',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
+                      color: tileOnSurfaceVariant,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

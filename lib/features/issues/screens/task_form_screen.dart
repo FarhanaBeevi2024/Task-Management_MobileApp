@@ -43,6 +43,8 @@ class TaskFormScreen extends ConsumerStatefulWidget {
 
 class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  final GlobalKey<FormFieldState<DateTime?>> _dueDateFieldKey = GlobalKey<FormFieldState<DateTime?>>();
+
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
   late final TextEditingController _storyPointsController;
@@ -299,9 +301,9 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
 
   String? _validateTitle(String? value) {
     final t = value?.trim() ?? '';
-    if (t.isEmpty) return 'Enter a title';
+    if (t.isEmpty) return 'Summary is required';
     if (t.length > _titleMaxLength) {
-      return 'Title must be at most $_titleMaxLength characters';
+      return 'Summary must be at most $_titleMaxLength characters';
     }
     return null;
   }
@@ -414,6 +416,7 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
           actualDays: act,
           exposedToClient: _exposedToClient,
           assigneeId: assigneeForApi,
+          includeAssigneeId: perms.project.canAssignIssuesToOthers,
           milestoneId: _milestoneId,
           workflowStatus: wf,
         );
@@ -588,7 +591,7 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                               child: DropdownButtonFormField<IssueStatus>(
                                 value: _status,
                                 isExpanded: true,
-                                decoration: _compactDropdownDecoration(scheme, brightness, label: 'Status'),
+                                decoration: _compactDropdownDecoration(scheme, brightness, label: 'Status *'),
                                 style: _fieldValueStyle(scheme, brightness, fontSize: 12),
                                 dropdownColor: scheme.surface,
                                 items: IssueStatus.values
@@ -599,6 +602,7 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                                       ),
                                     )
                                     .toList(),
+                                validator: (IssueStatus? v) => v == null ? 'Select a status' : null,
                                 onChanged: isBusy
                                     ? null
                                     : (v) {
@@ -619,12 +623,13 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                       DropdownButtonFormField<IssueStatus>(
                         value: _status,
                         isExpanded: true,
-                        decoration: _compactDropdownDecoration(scheme, brightness, label: 'Status'),
+                        decoration: _compactDropdownDecoration(scheme, brightness, label: 'Status *'),
                         style: _fieldValueStyle(scheme, brightness, fontSize: 13),
                         dropdownColor: scheme.surface,
                         items: IssueStatus.values
                             .map((s) => DropdownMenuItem(value: s, child: Text(s.label)))
                             .toList(),
+                        validator: (IssueStatus? v) => v == null ? 'Select a status' : null,
                         onChanged: isBusy
                             ? null
                             : (v) {
@@ -713,7 +718,7 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                       style: _fieldValueStyle(scheme, brightness, fontSize: 15),
                       textCapitalization: TextCapitalization.sentences,
                       decoration: InputDecoration(
-                        labelText: 'Summary',
+                        labelText: 'Summary *',
                         hintText: 'What needs to be done?',
                         labelStyle: _fieldLabelStyle(scheme, brightness),
                         floatingLabelStyle: _fieldLabelStyle(scheme, brightness),
@@ -734,46 +739,46 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                     ),
                     const SizedBox(height: 12),
                     _sectionTitle(scheme, brightness, 'Schedule & effort'),
-                    InkWell(
-                      onTap: isBusy ? null : _pickDueDate,
-                      borderRadius: BorderRadius.circular(10),
-                      child: InputDecorator(
-                        decoration: _compactDropdownDecoration(scheme, brightness, label: 'Due date').copyWith(
-                          suffixIcon: Icon(
-                            Icons.calendar_today_outlined,
-                            size: 18,
-                            color: brightness == Brightness.dark ? scheme.primary : _labelOnPastelLight,
-                          ),
-                        ),
-                        child: Text(
-                          _dueDate == null
-                              ? 'Tap to choose date'
-                              : '${_dueDate!.year}-${_dueDate!.month.toString().padLeft(2, '0')}-${_dueDate!.day.toString().padLeft(2, '0')}',
-                          style: _dueDate == null
-                              ? GoogleFonts.inter(
-                                  fontSize: 13,
-                                  color: brightness == Brightness.dark
-                                      ? scheme.onSurfaceVariant
-                                      : _labelOnPastelLight.withValues(alpha: 0.72),
-                                )
-                              : _fieldValueStyle(scheme, brightness, fontSize: 13),
-                        ),
-                      ),
-                    ),
-                    if (_dueDate != null)
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: isBusy ? null : () => setState(() => _dueDate = null),
-                          child: Text(
-                            'Clear due date',
-                            style: _fieldLabelStyle(scheme, brightness).copyWith(
-                              fontSize: 12,
-                              color: scheme.primary,
+                    FormField<DateTime?>(
+                      key: _dueDateFieldKey,
+                      initialValue: _dueDate,
+                      validator: (value) => value == null ? 'Due date is required' : null,
+                      builder: (field) {
+                        return InkWell(
+                          onTap: isBusy
+                              ? null
+                              : () async {
+                                  await _pickDueDate();
+                                  if (mounted) field.didChange(_dueDate);
+                                },
+                          borderRadius: BorderRadius.circular(10),
+                          child: InputDecorator(
+                            decoration: _compactDropdownDecoration(scheme, brightness, label: 'Due date *')
+                                .copyWith(
+                              errorText: field.errorText,
+                              suffixIcon: Icon(
+                                Icons.calendar_today_outlined,
+                                size: 18,
+                                color: brightness == Brightness.dark ? scheme.primary : _labelOnPastelLight,
+                              ),
+                            ),
+                            child: Text(
+                              _dueDate == null
+                                  ? 'Tap to choose date'
+                                  : '${_dueDate!.year}-${_dueDate!.month.toString().padLeft(2, '0')}-${_dueDate!.day.toString().padLeft(2, '0')}',
+                              style: _dueDate == null
+                                  ? GoogleFonts.inter(
+                                      fontSize: 13,
+                                      color: brightness == Brightness.dark
+                                          ? scheme.onSurfaceVariant
+                                          : _labelOnPastelLight.withValues(alpha: 0.72),
+                                    )
+                                  : _fieldValueStyle(scheme, brightness, fontSize: 13),
                             ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
+                    ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -825,7 +830,7 @@ class _TaskFormScreenState extends ConsumerState<TaskFormScreen> {
                             (u) => DropdownMenuItem(
                               value: u.userId,
                               child: Text(
-                                u.role != null ? '${u.email} (${u.role})' : u.email,
+                                u.role != null ? '${u.displayLabel} (${u.role})' : u.displayLabel,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
